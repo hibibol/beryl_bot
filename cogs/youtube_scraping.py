@@ -45,11 +45,12 @@ class  Youtube_Scraping(commands.Cog):
                     if not href in self.old_href_dict[word]:
                         for channel_id in channel_dict[str(i+1)]:
                             channel = self.bot.get_channel(channel_id)
-                            await channel.send(self.default_url+href)
-                            print(word,href)
+                            if channel:
+                                await channel.send(self.default_url+href)
                         self.old_href_dict[word].append(href)
+                        print(word,href)
 
-
+            await sleep(1)
 # Bot本体側からコグを読み込む際に呼び出される関数。
 def setup(bot):
     bot.add_cog(Youtube_Scraping(bot)) # TestCogにBotを渡してインスタンス化し、Botにコグとして登録する。
