@@ -27,7 +27,7 @@ class  Youtube_Scraping(commands.Cog):
         movie_list = soup.find_all("a",class_="yt-uix-tile-link yt-ui-ellipsis yt-ui-ellipsis-2 yt-uix-sessionlink spf-link")
         return [movie["href"] for movie in movie_list]
 
-    @tasks.loop(seconds=10.0)
+    @tasks.loop(seconds=60.0)
     async def youtube_scraping(self):
 
         with open("jsons/search_words.json","r") as f:
@@ -43,13 +43,13 @@ class  Youtube_Scraping(commands.Cog):
             else:
                 for href in href_list:
                     if not href in self.old_href_dict[word]:
+                        self.old_href_dict[word].append(href)
                         for channel_id in channel_dict[str(i+1)]:
                             channel = self.bot.get_channel(channel_id)
                             if channel:
                                 await channel.send(self.default_url+href)
-                        self.old_href_dict[word].append(href)
                         print(word,href)
-
+                        
             await sleep(1)
 # Bot本体側からコグを読み込む際に呼び出される関数。
 def setup(bot):
