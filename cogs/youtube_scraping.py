@@ -53,7 +53,7 @@ class  Youtube_Scraping(commands.Cog):
                             if channel:
                                 try:
                                     await channel.send(self.default_url+href)
-                                    print("success at ",channel.guid.name)
+                                    print("success at ",channel.guild.name)
                                 except Forbidden:
                                     tmp_channel_dict[str(i+1)].remove(channel_id)
                                     print("delete channel at ",channel.guild.name)
