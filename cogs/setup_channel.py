@@ -1,7 +1,7 @@
 from discord.ext import commands # Bot Commands Frameworkのインポート
 from discord import Forbidden
 import json
-from discord import Client
+from discord import Embed
 
 # コグとして用いるクラスを定義。
 class SetupChannel(commands.Cog):
@@ -40,7 +40,21 @@ class SetupChannel(commands.Cog):
                 json.dump(channels,f,ensure_ascii=False, indent=4)
 
             return await ctx.send(f"セットアップを完了しました\n今後は <#{channel1.id}><#{channel2.id}><#{channel3.id}><#{channel4.id}><#{channel5.id}> に動画を送信します")
-            
+
+    @commands.command()
+    async def about(self,ctx):
+        appinfo = await self.bot.application_info()
+        embed=Embed(description=appinfo.description, color=0xeb8d7e)
+        # embed.set_author(name=appinfo.name,icon_url=appinfo.icon_url)
+
+        with open("jsons/channels.json","r") as f:
+            channels = json.load(f)
+        with open("jsons/config.json","r") as f:
+            config = json.load(f)
+        embed.add_field(name="登録チャンネル数",value=f"{str(len(channels['1']))}*5個")
+        embed.add_field(name="使用中のスプレッドシート",value=f"https://docs.google.com/spreadsheets/d/{config['spreadsheetId']}")
+        await ctx.send(embed=embed)
+
             
 # Bot本体側からコグを読み込む際に呼び出される関数。
 def setup(bot):
