@@ -22,11 +22,10 @@ default_youtube_url = "https://www.youtube.com/watch?v="
 class  Youtube_Scraping(commands.Cog):
     def __init__(self,bot):
         self.bot = bot
-        self.old_href_dict = {}
-        self.default_url = "https://www.youtube.com"
-        # self.youtube_scraping.start()
+        self.old_id_dict = {}
         self.ss_service, self.drive_service = self.init_drive()
         self.youtube = self.init_youtube()
+        self.notify_movies.start()
 
 
     def init_drive(self):
@@ -58,7 +57,7 @@ class  Youtube_Scraping(commands.Cog):
         return apiclient.discovery.build('youtube', 'v3', developerKey=api_key)
 
     #todo 非同期にする
-    def search_movies(self, q):
+    def search_movies(self, q: str):
         """
         YouTube Data APIを用いて動画をupload dateの順で検索した結果を返す
         引数
@@ -361,46 +360,65 @@ class  Youtube_Scraping(commands.Cog):
         await ctx.send(f"https://docs.google.com/spreadsheets/d/{config['spreadsheetId']}")
 
     
+    @tasks.loop(minutes=5)
+    async def notify_movies(self):
+        """
+        定期的にyoutubeを検索して新しく出てきた動画を設定した動画に送信する
+        """
 
+        with open("jsons/search_words.json","r") as f:
+            word_list = json.load(f)["WORDS"]
+        with open("jsons/channels.json","r") as f:
+            channel_dict = json.load(f)
+        invalid_channel_dict = {"1":[],"2":[],"3":[],"4":[],"5":[]}
+        tmp_channel_dict = copy(channel_dict)
+        for i,word in enumerate(word_list):
+            items = self.search_movies(word)
+            if not word in self.old_id_dict:
+                self.old_id_dict[word] = [search_resouce['id']['videoId'] for search_resouce in items]
+            else:
+                for search_resouce in items:
+                    if not search_resouce['id']['videoId'] in self.old_id_dict[word]:
+                        
+                        self.old_id_dict[word].append(search_resouce['id']['videoId'])
+                        
+                        youtube_url = f"{default_youtube_url}{search_resouce['id']['videoId']}"
+                        total_damage, chars, tl = await self.get_battle_info(youtube_url)
+                        level = self.get_level(search_resouce["snippet"]["title"],search_resouce["snippet"]["description"])
+                        
+                        self.append_value_gss(f"ボス{str(i+1)}", level, total_damage, chars, search_resouce["snippet"]["title"], youtube_url, tl)
+                        embed = self.make_embed_message(search_resouce, total_damage, chars, level)
+                        
+                        for channel_id in channel_dict[str(i+1)]:
+                            channel = self.bot.get_channel(channel_id)
+                            if channel:
+                                try:
+                                    await channel.send(embed=embed)
+                                    print("sent to ", channel.guild.name, flush=True)
+                                    await sleep(0.4)
+                                except Forbidden:
+                                    invalid_channel_dict[str(i+1)].append(channel_id)
+                                    print("channel deleted: ",channel.guild.name, flush=True)
+                                except Exception as e:
+                                    print("raise error: ", e, flush=True)
+                            else:
+                                invalid_channel_dict[str(i+1)].append(channel_id)
+                                print("Invalid Id :",channel_id,flush=True)
+            await sleep(1)
 
-    # @tasks.loop(minutes=5)
-    # async def youtube_scraping(self):
+        #  channes.jsonからinvalid_channelを削除
+        with open("jsons/channels.json","r") as f:
+            channel_dict = json.load(f)
 
-    #     with open("jsons/search_words.json","r") as f:
-    #         word_list = json.load(f)["WORDS"]
-    #     with open("jsons/channels.json","r") as f:
-    #         channel_dict = json.load(f)
-    #     tmp_channel_dict = copy(channel_dict)
-    #     for i,word in enumerate(word_list):
-    #         search_url = f"https://www.youtube.com/results?search_query={parse.quote(word)}&sp=CAI%253D"
-    #         href_list = await self.fetch_href_list(search_url)
-    #         if not word in self.old_href_dict:
-    #             self.old_href_dict[word] = href_list
-    #         else:
-    #             for href in href_list:
-    #                 if not href in self.old_href_dict[word]:
-    #                     self.old_href_dict[word].append(href)
-    #                     print(word,href)
-    #                     for channel_id in channel_dict[str(i+1)]:
-    #                         channel = self.bot.get_channel(channel_id)
-    #                         if channel:
-    #                             try:
-    #                                 await channel.send(self.default_url+href)
-    #                                 print("success at ",channel.guild.name)
-    #                             except Forbidden:
-    #                                 tmp_channel_dict[str(i+1)].remove(channel_id)
-    #                                 print("delete channel at ",channel.guild.name)
-    #                             except:
-    #                                 print("raise error",flush=True)
-    #                         else:
-    #                             tmp_channel_dict[str(i+1)].remove(channel_id)
-    #                             print("delete channel id:",channel_id,flush=True)
-
-    #         with open("jsons/channels.json","w") as f:
-    #             json.dump(tmp_channel_dict,f,ensure_ascii=False, indent=4)
-    #         await sleep(1)
-
+        for key in channel_dict.keys():
+            for chennel_id in invalid_channel_dict[key]:
+                if channel_id in channel_dict[key]:
+                    channel_dict[key].remove(channel_id)
+        
+        with open("jsons/channels.json","w") as f:
+            json.dump(channel_dict,f,ensure_ascii=False, indent=4)
 
 # Bot本体側からコグを読み込む際に呼び出される関数。
 def setup(bot):
     bot.add_cog(Youtube_Scraping(bot)) # TestCogにBotを渡してインスタンス化し、Botにコグとして登録する。
+
