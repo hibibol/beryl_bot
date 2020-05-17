@@ -1,7 +1,6 @@
-jsons/config.json
-jsons/sheet_properties.json
-jsons/credentials.json
+jsons/*
 Untitled.ipynb
 .ipynb_checkpoints/
 .vscode/
 token.pickle
+
