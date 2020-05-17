@@ -7,8 +7,6 @@ from urllib import parse
 import aiohttp
 from asyncio import sleep
 
-from copy import copy
-
 import pickle
 import os.path
 from googleapiclient.discovery import build
@@ -371,7 +369,6 @@ class  Youtube_Scraping(commands.Cog):
         with open("jsons/channels.json","r") as f:
             channel_dict = json.load(f)
         invalid_channel_dict = {"1":[],"2":[],"3":[],"4":[],"5":[]}
-        tmp_channel_dict = copy(channel_dict)
         for i,word in enumerate(word_list):
             items = self.search_movies(word)
             if not word in self.old_id_dict:
@@ -411,7 +408,7 @@ class  Youtube_Scraping(commands.Cog):
             channel_dict = json.load(f)
 
         for key in channel_dict.keys():
-            for chennel_id in invalid_channel_dict[key]:
+            for channel_id in invalid_channel_dict[key]:
                 if channel_id in channel_dict[key]:
                     channel_dict[key].remove(channel_id)
         
