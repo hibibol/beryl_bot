@@ -1,3 +1,5 @@
+import datetime
+
 from discord.ext import tasks, commands
 from discord import Forbidden, Embed
 import json
@@ -24,8 +26,10 @@ class Youtube_Scraping(commands.Cog):
         self.old_id_dict = {}
         self.ss_service, self.drive_service = self.init_drive()
         self.youtube = self.init_youtube()
-        self.notify_movies.start()
         self.search_boss_number = 0
+        self.start_time = datetime.datetime.now().isoformat() + "Z"
+
+        self.notify_movies.start()
 
     def init_drive(self):
         creds = None
@@ -69,7 +73,8 @@ class Youtube_Scraping(commands.Cog):
             part="snippet",
             q=q,
             order="date",
-            type="video"
+            type="video",
+            publishedAfter=self.start_time
         ).execute()
         return search_response["items"]
     
@@ -371,21 +376,25 @@ class Youtube_Scraping(commands.Cog):
         q = f"{query_list[self.search_boss_number]} OR {query_list[(self.search_boss_number+1)%5]}"
         tmp_boss_name_list = [name_list[(self.search_boss_number)], name_list[(self.search_boss_number + 1) % 5]]
 
-        new_boss_word = [False, False]
-
         for i, boss_name in enumerate(tmp_boss_name_list):
             if boss_name not in self.old_id_dict.keys():
                 self.old_id_dict[boss_name] = []
-                new_boss_word[i] = True
+        
+        print(datetime.datetime.now(), q, flush=True)
 
         items = self.search_movies(q)
         for search_resouce in items:
             for i, boss_name in enumerate(tmp_boss_name_list):
                 if boss_name in search_resouce["snippet"]["title"]:
+                    
+                    if search_resouce['id']["videoId"] in self.old_id_dict[boss_name]:
+                        continue
+                    
                     self.old_id_dict[boss_name].append(search_resouce['id']["videoId"])
                     
-                    if new_boss_word[i]:
-                        continue
+                    for remove_word in search_dict[f"REMOVE{str(i+1)}"]:
+                        if remove_word in search_resouce["snippet"]["title"]:
+                            continue    
                     
                     boss_number = (self.search_boss_number + i) % 5 + 1
                     sheet_name = f"ボス{str(boss_number)}"
@@ -413,18 +422,24 @@ class Youtube_Scraping(commands.Cog):
                         else:
                             invalid_channel_dict[channel_dict_key].append(channel_id)
                             print("Invalid Id :", channel_id, flush=True)
+        
+        self.search_boss_number = (self.search_boss_number + 2) % 5
 
         #  channes.jsonからinvalid_channelを削除
         with open("jsons/channels.json", "r") as f:
-            channel_dict = json.load(f)
+            tmp_channel_dict = json.load(f)
 
-        for key in channel_dict.keys():
+        for key in tmp_channel_dict.keys():
             for chennel_id in invalid_channel_dict[key]:
-                if channel_id in channel_dict[key]:
-                    channel_dict[key].remove(channel_id)
+                if channel_id in tmp_channel_dict[key]:
+                    tmp_channel_dict[key].remove(channel_id)
         
         with open("jsons/channels.json", "w") as f:
-            json.dump(channel_dict, f, ensure_ascii=False, indent=4)
+            json.dump(tmp_channel_dict, f, ensure_ascii=False, indent=4)
+
+        with open("jsons/old_dict.json", "w") as f:
+            json.dump(self.old_id_dict, f, ensure_ascii=False, indent=4)
+
 
     @commands.Cog.listener()
     async def on_command_error(self, ctx, error):
