@@ -23,7 +23,8 @@ default_youtube_url = "https://www.youtube.com/watch?v="
 class Youtube_Scraping(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.old_id_dict = {}
+        with open("jsons/old_dict.json", "w") as f:
+            self.old_id_dict = json.load(f)
         self.ss_service, self.drive_service = self.init_drive()
         self.youtube = self.init_youtube()
         self.search_boss_number = 0
@@ -363,11 +364,15 @@ class Youtube_Scraping(commands.Cog):
         """
         定期的にyoutubeを検索して新しく出てきた動画を設定した動画に送信する
         """
+        if not self.bot.is_ready():
+            print("bot is not ready", flush=True)
+            return 
 
+        print("start search", flush=True)
         with open("jsons/search_words.json", "r") as f:
             search_dict = json.load(f)
         query_list = search_dict["WORDS"]
-        name_list = search_dict["NAME"]
+        name_list = search_dict["NAMES"]
 
         with open("jsons/channels.json", "r") as f:
             channel_dict = json.load(f)
@@ -383,6 +388,9 @@ class Youtube_Scraping(commands.Cog):
         print(datetime.datetime.now(), q, flush=True)
 
         items = self.search_movies(q)
+
+        await sleep(5*60)  # プリログの安定化のために5分待ってからプリログに投げる
+
         for search_resouce in items:
             for i, boss_name in enumerate(tmp_boss_name_list):
                 if boss_name in search_resouce["snippet"]["title"]:
@@ -430,7 +438,7 @@ class Youtube_Scraping(commands.Cog):
             tmp_channel_dict = json.load(f)
 
         for key in tmp_channel_dict.keys():
-            for chennel_id in invalid_channel_dict[key]:
+            for channel_id in invalid_channel_dict[key]:
                 if channel_id in tmp_channel_dict[key]:
                     tmp_channel_dict[key].remove(channel_id)
         
@@ -439,6 +447,8 @@ class Youtube_Scraping(commands.Cog):
 
         with open("jsons/old_dict.json", "w") as f:
             json.dump(self.old_id_dict, f, ensure_ascii=False, indent=4)
+
+        print("end search", flush=True)
 
 
     @commands.Cog.listener()
