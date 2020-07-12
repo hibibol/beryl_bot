@@ -1,5 +1,6 @@
 import datetime
 
+import discord
 from discord.ext import tasks, commands
 from discord import Forbidden, Embed
 import json
@@ -18,13 +19,15 @@ import apiclient
 
 
 default_youtube_url = "https://www.youtube.com/watch?v="
-
+FILTER_SETTING_FILE = "jsons/level.json"
+CONFIG_FILE = "jsons/config.json"
 
 class Youtube_Scraping(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        with open("jsons/old_dict.json", "w") as f:
-            self.old_id_dict = json.load(f)
+        # with open("jsons/old_dict.json", "r") as f:
+        #     self.old_id_dict = json.load(f)
+        self.old_id_dict = {}
         self.ss_service, self.drive_service = self.init_drive()
         self.youtube = self.init_youtube()
         self.search_boss_number = 0
@@ -56,7 +59,7 @@ class Youtube_Scraping(commands.Cog):
         return build('sheets', 'v4', credentials=creds), build('drive', 'v3', credentials=creds)
     
     def init_youtube(self):
-        with open("jsons/config.json") as f:
+        with open(CONFIG_FILE) as f:
             api_key = json.load(f)["GOOGLE"]
         
         return apiclient.discovery.build('youtube', 'v3', developerKey=api_key)
@@ -125,6 +128,18 @@ class Youtube_Scraping(commands.Cog):
             動画を知らせる用の埋め込みメッセージ
         """
 
+        color_dict = {
+            "1": discord.Colour.from_rgb(236, 120, 77),
+            "2": discord.Colour.from_rgb(184, 184, 220),
+            "3": discord.Colour.from_rgb(253, 251, 174),
+            "4": discord.Colour.from_rgb(190, 129, 244)
+        }
+
+        if len(level) == 0:
+            embed_color = 0xeb8d7e
+        else:
+            embed_color = color_dict[level]
+
         # 動画の説明がめちゃめちゃ長い場合には切り取って表示する
         description = search_resouce["snippet"]["description"]
         if len(description) > 250:
@@ -134,7 +149,7 @@ class Youtube_Scraping(commands.Cog):
             title=search_resouce["snippet"]["title"],
             description=description,
             url=f"{default_youtube_url}{search_resouce['id']['videoId']}",
-            color=0xeb8d7e
+            color=embed_color
         )
         embed.set_author(name=search_resouce["snippet"]["channelTitle"])
         embed.set_thumbnail(url=search_resouce["snippet"]["thumbnails"]["default"]["url"])
@@ -162,7 +177,7 @@ class Youtube_Scraping(commands.Cog):
         
         append_object = [level, total_damage] + tmp_chars + [title, youtube_url, tl]
         value_range_body = {"values": [append_object]}
-        with open("jsons/config.json") as f:
+        with open(CONFIG_FILE) as f:
             spreadsheetId = json.load(f)["spreadsheetId"]
 
         self.ss_service.spreadsheets().values().append(
@@ -187,7 +202,7 @@ class Youtube_Scraping(commands.Cog):
                         },
                         "fields": "pixelSize",
                         "properties": {
-                            "pixelSize": 30
+                            "pixelSize": 40
                         }
                     }
                 },
@@ -339,10 +354,10 @@ class Youtube_Scraping(commands.Cog):
             ).execute()
 
             # spreadsheetId をconfigに登録する
-            with open("jsons/config.json", "r") as f:
+            with open(CONFIG_FILE, "r") as f:
                 config = json.load(f)
             config["spreadsheetId"] = spreadsheetId
-            with open("jsons/config.json", "w") as f:
+            with open(CONFIG_FILE, "w") as f:
                 json.dump(config, f, ensure_ascii=False, indent=4)
             with open("jsons/sheet_properties.json", "w") as f:
                 json.dump(sheet_properties, f, ensure_ascii=False, indent=4)
@@ -350,14 +365,53 @@ class Youtube_Scraping(commands.Cog):
         
         except Exception as e:
             await ctx.send(f"```\n{e}\n```")
+    
+    async def set_level(self, channel: discord.TextChannel, level_number: int) -> None:
+        """
+        フィルタ設定を保存する
+        """
+        with open(FILTER_SETTING_FILE, "r") as f:
+            setting_dict = json.load(f)
+        
+        setting_dict[str(channel.guild.id)] = level_number
+        
+        with open(FILTER_SETTING_FILE, "w") as f:
+            json.dump(setting_dict, f, ensure_ascii=False, indent=4)
+        
+        return await channel.send(f"{level_number}段階目以上の動画を送信します")
             
     @commands.command(aliases=["スプシ", "スプレッドシート", "gss", "ss"])
     async def show_gss(self, ctx):
         """現在使用しているスプレッドシートを表示する"""
 
-        with open("jsons/config.json", "r") as f:
+        with open(CONFIG_FILE, "r") as f:
             config = json.load(f)
         await ctx.send(f"https://docs.google.com/spreadsheets/d/{config['spreadsheetId']}")
+
+    @commands.command()
+    async def archives(self, ctx):
+        """過去のクラバト動画のスプシを保存しているフォルダを表示"""
+        await ctx.send("https://drive.google.com/drive/folders/1spCbnI2hnpPSUKwqpEzAJ2jkfc5WEc0p?usp=sharing")
+
+    @commands.command(name="level")
+    async def _level(self, ctx, level_number: int):
+        """ベリルちゃんがdiscordに投稿する動画の段階数フィルタを設定する
+        設定はサーバー単位で反映
+        設定した段階数以上と段階数が不明な動画のみを投稿する
+
+        引数
+        -------------
+        level_number: 制限する段階数
+        """
+        await self.set_level(ctx.channel, level_number)
+    
+    @commands.Cog.listener('on_message')
+    async def _level_on_message(self, message: discord.Message):
+        """段階数フィルター設定 Botからの入力を受け付ける用"""
+        if message.author.bot:
+            arg_list = message.content.split()
+            if arg_list[0] == "b.level" and arg_list[1].isdecimal():
+                await self.set_level(message.channel, int(arg_list[1]))
 
     @tasks.loop(minutes=15)
     async def notify_movies(self):
@@ -402,7 +456,7 @@ class Youtube_Scraping(commands.Cog):
                     
                     for remove_word in search_dict[f"REMOVE{str(i+1)}"]:
                         if remove_word in search_resouce["snippet"]["title"]:
-                            continue    
+                            continue
                     
                     boss_number = (self.search_boss_number + i) % 5 + 1
                     sheet_name = f"ボス{str(boss_number)}"
@@ -415,18 +469,28 @@ class Youtube_Scraping(commands.Cog):
                     self.append_value_gss(sheet_name, level, total_damage, chars, search_resouce["snippet"]["title"], youtube_url, tl)
                     embed = self.make_embed_message(search_resouce, total_damage, chars, level)
 
+                    with open(FILTER_SETTING_FILE, "r") as f:
+                        filter_setting = json.load(f)
+
                     for channel_id in channel_dict[channel_dict_key]:
                         channel = self.bot.get_channel(channel_id)
                         if channel:
-                            try:
-                                await channel.send(embed=embed)
-                                print("sent to ", channel.guild.name, flush=True)
-                                await sleep(0.4)
-                            except Forbidden:
-                                invalid_channel_dict[channel_dict_key].append(channel_id)
-                                print("channel deleted: ", channel.guild.name, flush=True)
-                            except Exception as e:
-                                print("raise error: ", e, flush=True)
+                            flag = False
+                            if len(level) > 0:
+                                if int(level) > filter_setting[str(channel.guild.id)]:
+                                    flag = True
+                            else:
+                                flag = True
+                            if flag:
+                                try:
+                                    await channel.send(embed=embed)
+                                    print("sent to ", channel.guild.name, flush=True)
+                                    await sleep(0.4)
+                                except Forbidden:
+                                    invalid_channel_dict[channel_dict_key].append(channel_id)
+                                    print("channel deleted: ", channel.guild.name, flush=True)
+                                except Exception as e:
+                                    print("raise error: ", e, flush=True)
                         else:
                             invalid_channel_dict[channel_dict_key].append(channel_id)
                             print("Invalid Id :", channel_id, flush=True)
@@ -449,7 +513,6 @@ class Youtube_Scraping(commands.Cog):
             json.dump(self.old_id_dict, f, ensure_ascii=False, indent=4)
 
         print("end search", flush=True)
-
 
     @commands.Cog.listener()
     async def on_command_error(self, ctx, error):
