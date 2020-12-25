@@ -25,9 +25,9 @@ CONFIG_FILE = "jsons/config.json"
 class Youtube_Scraping(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        # with open("jsons/old_dict.json", "r") as f:
-        #     self.old_id_dict = json.load(f)
-        self.old_id_dict = {}
+        with open("jsons/old_dict.json", "r") as f:
+            self.old_id_dict = json.load(f)
+        # self.old_id_dict = {}
         self.ss_service, self.drive_service = self.init_drive()
         self.youtube = self.init_youtube()
         self.search_boss_number = 0
@@ -132,7 +132,8 @@ class Youtube_Scraping(commands.Cog):
             "1": discord.Colour.from_rgb(236, 120, 77),
             "2": discord.Colour.from_rgb(184, 184, 220),
             "3": discord.Colour.from_rgb(253, 251, 174),
-            "4": discord.Colour.from_rgb(190, 129, 244)
+            "4": discord.Colour.from_rgb(190, 129, 244),
+            "5": discord.Colour.from_rgb(100, 27, 32)
         }
 
         if len(level) == 0:
@@ -240,21 +241,17 @@ class Youtube_Scraping(commands.Cog):
         """
         動画のタイトルもしくは説明から段階数を取ってくる
         """
-
-        ex_words = ["4段", "４段", "四段", "4週", "４週", "四週"]
-        vh_words = ["3段", "３段", "三段", "3週", "３週", "三週"]
-        h_words = ["2段", "２段", "二段", "2週", "２週", "二週"]
-        n_words = ["1段", "１段", "一段", "1週", "１週", "一週"]
-
-        if self.check_contain_words(ex_words, title) or self.check_contain_words(ex_words, description):
-            return "4"
-        elif self.check_contain_words(vh_words, title) or self.check_contain_words(vh_words, description):
-            return "3"
-        elif self.check_contain_words(h_words, title) or self.check_contain_words(h_words, description):
-            return "2"
-        elif self.check_contain_words(n_words, title) or self.check_contain_words(n_words, description):
-            return "1"
-
+        keywords_list = [
+            ["5段", "５段", "五段", "5週", "５週", "五週"],
+            ["4段", "４段", "四段", "4週", "４週", "四週"],
+            ["3段", "３段", "三段", "3週", "３週", "三週"],
+            ["2段", "２段", "二段", "2週", "２週", "二週"],
+            ["1段", "１段", "一段", "1週", "１週", "一週"]
+        ]
+        for text in (title, description):
+            for i, keywords in enumerate(keywords_list):
+                if self.check_contain_words(keywords, text):
+                    return str(5-i)
         return ""
 
     @commands.command()
@@ -404,12 +401,21 @@ class Youtube_Scraping(commands.Cog):
         level_number: 制限する段階数
         """
         await self.set_level(ctx.channel, level_number)
+
+    @commands.command()
+    @commands.is_owner()
+    async def reset_level(self, ctx):
+        """段階数フィルタを初期化する
+        """
+        pass
     
     @commands.Cog.listener('on_message')
     async def _level_on_message(self, message: discord.Message):
         """段階数フィルター設定 Botからの入力を受け付ける用"""
         if message.author.bot:
             arg_list = message.content.split()
+            if len(arg_list) != 2:
+                return
             if arg_list[0] == "b.level" and arg_list[1].isdecimal():
                 await self.set_level(message.channel, int(arg_list[1]))
 
@@ -465,8 +471,11 @@ class Youtube_Scraping(commands.Cog):
                     youtube_url = f"{default_youtube_url}{search_resouce['id']['videoId']}"
                     total_damage, chars, tl = await self.get_battle_info(youtube_url)
                     level = self.get_level(search_resouce["snippet"]["title"], search_resouce["snippet"]["description"])
-
-                    self.append_value_gss(sheet_name, level, total_damage, chars, search_resouce["snippet"]["title"], youtube_url, tl)
+                    try:
+                        self.append_value_gss(sheet_name, level, total_damage, chars, search_resouce["snippet"]["title"], youtube_url, tl)
+                    except Exception as e:
+                        print(e, flush=True)
+                        print(sheet_name, level, total_damage, chars, search_resouce["snippet"]["title"], youtube_url, tl, flush=True)
                     embed = self.make_embed_message(search_resouce, total_damage, chars, level)
 
                     with open(FILTER_SETTING_FILE, "r") as f:
@@ -477,7 +486,7 @@ class Youtube_Scraping(commands.Cog):
                         if channel:
                             flag = False
                             if len(level) > 0:
-                                if int(level) > filter_setting[str(channel.guild.id)]:
+                                if str(channel.guild.id) not in filter_setting.keys() or int(level) >= filter_setting[str(channel.guild.id)]:
                                     flag = True
                             else:
                                 flag = True
