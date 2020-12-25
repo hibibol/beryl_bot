@@ -1,4 +1,5 @@
-from discord.ext import tasks,commands # Bot Commands Frameworkをインポート
+from discord.ext import tasks, commands
+from discord import Intents
 import json
 import traceback # エラー表示のためにインポート
 
@@ -13,9 +14,9 @@ INITIAL_EXTENSIONS = [
 class MyBot(commands.Bot):
 
     # MyBotのコンストラクタ。
-    def __init__(self, command_prefix):
+    def __init__(self, command_prefix, intents):
         # スーパークラスのコンストラクタに値を渡して実行。
-        super().__init__(command_prefix)
+        super().__init__(command_prefix, intents=intents)
 
         # INITIAL_COGSに格納されている名前から、コグを読み込む。
         # エラーが発生した場合は、エラー内容を表示。
@@ -35,7 +36,8 @@ class MyBot(commands.Bot):
 
 # MyBotのインスタンス化及び起動処理。
 if __name__ == '__main__':
+    intents = Intents.default()
     with open("jsons/config.json","r") as f:
         TOKEN = json.load(f)["DISCORD_TOKEN"]
-    bot = MyBot(command_prefix='b.')
+    bot = MyBot(command_prefix='b.', intents=intents)
     bot.run(TOKEN) # Botのトークン
