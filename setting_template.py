@@ -5,3 +5,4 @@ JST = timezone(timedelta(hours=+9), "JST")
 
 YOUTUBE_API_KEY = ""
 TOKEN = ""
+DB_NAME = ""

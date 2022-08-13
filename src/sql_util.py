@@ -1,6 +1,7 @@
 import sqlite3
 
-DB_NAME = "/home/ubuntu/repo/temp_beryl/beryl.db"
+from setting import DB_NAME
+
 REGISTER_CHANNELDATA_SQL = """insert into ChannelData values (
 :guild_id,
 :category_id,
