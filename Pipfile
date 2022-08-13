@@ -1,17 +1,14 @@
 [[source]]
-name = "pypi"
-url = "https://pypi.org/simple"
+url = "https://pypi.python.org/simple"
 verify_ssl = true
-
-[dev-packages]
-flake8 = "*"
+name = "pypi"
 
 [packages]
-discord-py = "==1.5.1"
+discord-py-interactions = "*"
 google-api-python-client = "*"
-jupyter = "*"
-google-auth-httplib2 = "*"
-google-auth-oauthlib = "*"
+
+[dev-packages]
+isort = "*"
 
 [requires]
-python_version = "3.8"
+python_version = "3.9"
