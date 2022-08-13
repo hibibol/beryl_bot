@@ -85,7 +85,7 @@ class SearchBossIndex:
 
 async def notify_videos():
     while True:
-        await asyncio.sleep(5 * 60)
+        await asyncio.sleep(30 * 60)
 
         boss_names = ClanBattleData.boss_names
         print(boss_names)
