@@ -88,7 +88,6 @@ async def notify_videos():
         await asyncio.sleep(30 * 60)
 
         boss_names = ClanBattleData.boss_names
-        print(boss_names)
         next_boss_index = (SearchBossIndex.index + 1) % 5
         target_bosses = [
             (SearchBossIndex.index, boss_names[SearchBossIndex.index]),
