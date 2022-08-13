@@ -55,4 +55,4 @@ async def update_clanbattledata():
     while True:
         if datetime.now(JST).strftime("%H:%M") == "12:00" or not ClanBattleData.boss_names:
             await get_clan_battle_data()
-        await asyncio.sleep(60)
+        await asyncio.sleep(55)
