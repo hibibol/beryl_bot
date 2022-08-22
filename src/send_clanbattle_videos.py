@@ -74,7 +74,9 @@ async def send_embed_messages(boss_index: int, embed: interactions.Embed):
         try:
             channel = await interactions.get(bot, interactions.Channel, object_id=channel_ids[boss_index])
             await channel.send(embeds=embed)
-        except interactions.error.LibraryException:
+        except Exception as e:
+            print(e, flash=True)
+            print(f"delete channel, category_id = {category_id}", flash=True)
             delete_channel_data(category_id)
         await asyncio.sleep(1)
 
